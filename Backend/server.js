@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+require("dotenv").config({ path: __dirname + "/.env" });
 
 const connectDB = require("./db");
 const Product = require("./models/Product");
@@ -8,6 +8,15 @@ const Product = require("./models/Product");
 // ✅ Routes
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const productRoutes = require("./routes/productRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
+const userRoutes = require("./routes/userRoutes");
+
+// ✅ Auth Middleware
+const { protect } = require("./middleware/auth");
+const { admin } = require("./middleware/adminMiddleware");
 
 const app = express();
 
@@ -20,39 +29,16 @@ connectDB();
 
 // ✅ Routes
 app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/api/admin", protect, admin, adminRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/user", userRoutes);
 
-// ✅ GET products (search)
-app.get("/products", async (req, res) => {
-  const query = req.query.query?.toLowerCase();
+// Note: Removed the old test app.get("/products") since it's now handled by productRoutes
 
-  try {
-    let products;
 
-    if (query) {
-      products = await Product.find({
-        name: { $regex: query, $options: "i" }
-      });
-    } else {
-      products = await Product.find();
-    }
-
-    res.json(products);
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// ✅ ADD product (for testing)
-app.post("/add-product", async (req, res) => {
-  try {
-    const product = new Product(req.body);
-    await product.save();
-    res.json(product);
-  } catch (err) {
-    res.status(500).json({ error: "Error saving product" });
-  }
-});
 
 // ✅ Start server
 app.listen(5000, () => {

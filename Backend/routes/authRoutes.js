@@ -15,7 +15,7 @@ router.post('/register', async (req, res) => {
   const user = await User.create({ name, email, password });
   res.status(201).json({
     _id: user._id, name: user.name,
-    email: user.email, role: user.role,
+    email: user.email, isAdmin: user.isAdmin,
     token: generateToken(user._id)
   });
 });
@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
   if (user && await user.matchPassword(password)) {
     res.json({
       _id: user._id, name: user.name,
-      email: user.email, role: user.role,
+      email: user.email, isAdmin: user.isAdmin,
       token: generateToken(user._id)
     });
   } else {

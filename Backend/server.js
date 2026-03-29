@@ -1,15 +1,26 @@
 const express = require("express");
 const cors = require("cors");
+require("dotenv").config();
+
 const connectDB = require("./db");
 const Product = require("./models/Product");
 
+// ✅ Routes
+const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+
 const app = express();
 
+// ✅ Middleware
 app.use(cors());
 app.use(express.json());
 
 // ✅ Connect MongoDB
 connectDB();
+
+// ✅ Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ✅ GET products (search)
 app.get("/products", async (req, res) => {
@@ -43,10 +54,7 @@ app.post("/add-product", async (req, res) => {
   }
 });
 
+// ✅ Start server
 app.listen(5000, () => {
   console.log("Server running on port 5000");
 });
-const cors = require('cors');
-
-// Add this right after `const app = express();`
-app.use(cors());

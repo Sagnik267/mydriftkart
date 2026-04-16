@@ -11,8 +11,8 @@ export default function ShopLogin() {
   const handleLogin = async () => {
     if (phone && password) {
       try {
-        const res = await axios.post("/api/auth/login", { email: phone, password });
-        if (res.data.isShopkeeper) {
+        const res = await axios.post("/api/auth/login/shopkeeper", { email: phone, password });
+        if (res.data.role === 'shopkeeper') {
           localStorage.setItem("token", res.data.token);
           localStorage.setItem("shopkeeper", JSON.stringify({ phone, shop: res.data.name }));
           navigate("/shop/dashboard");

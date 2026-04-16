@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
 const Review = require('../models/Review');
+const Category = require('../models/Category');
 
 // GET /api/products/categories - list all unique categories
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await Product.distinct("category");
+    const categories = await Category.find({}, { name: 1, slug: 1, imageUrl: 1 });
     res.json(categories);
   } catch (err) {
     res.status(500).json({ error: "Server error fetching categories" });
@@ -34,6 +35,7 @@ router.get('/', async (req, res) => {
     if (sort === 'desc') sortOptions.price = -1;
 
     const products = await Product.find(query)
+      .populate('category')
       .sort(sortOptions)
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
@@ -54,7 +56,7 @@ router.get('/', async (req, res) => {
 // GET /api/products/:id - single product detail with avg rating
 router.get('/:id', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).populate('category');
     if (!product) return res.status(404).json({ message: "Product not found" });
 
     // Calculate average rating

@@ -127,14 +127,14 @@ export default function ShopPage() {
               All Products
             </label>
             {categories.map(cat => (
-              <label key={cat} className="custom-checkbox-label">
+              <label key={cat._id} className="custom-checkbox-label">
                 <input 
                   type="checkbox" 
-                  checked={categoryQuery === cat} 
-                  onChange={() => handleCategoryChange(cat)} 
+                  checked={categoryQuery === cat._id} 
+                  onChange={() => handleCategoryChange(cat._id)} 
                 />
                 <span className="checkmark"></span>
-                {cat}
+                {cat.name}
               </label>
             ))}
           </div>
@@ -256,7 +256,7 @@ export default function ShopPage() {
                             className="card-image"
                           />
                         </Link>
-                        <div className="card-badge">{product.category}</div>
+                        <div className="card-badge">{product.category?.name || "General"}</div>
                       </div>
                       <div className="card-content">
                         <Link to={`/product/${product._id}`} className="card-title" style={{ fontSize: '1.25rem' }}>
@@ -278,10 +278,10 @@ export default function ShopPage() {
                         <button 
                           className="btn-add-cart-new ripple-btn" 
                           onClick={(e) => { e.preventDefault(); handleAddToCart(product._id); }}
-                          disabled={product.stock <= 0}
+                          disabled={!product.inStock}
                           style={{ marginTop: '1rem' }}
                         >
-                          {product.stock > 0 ? "🛍️ Add to Cart" : "Out of Stock"}
+                          {product.inStock ? "🛍️ Add to Cart" : "Out of Stock"}
                         </button>
                       </div>
                     </div>

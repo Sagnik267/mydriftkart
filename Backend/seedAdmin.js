@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ path: __dirname + '/.env' });
 const mongoose = require("mongoose");
 const User = require("./models/User");
 
@@ -21,7 +21,7 @@ const seedAdmin = async () => {
       name: "Admin User",
       email: "admin@driftkart.com",
       password: "Admin@123", // Will be hashed by pre-save hook in User model
-      isAdmin: true,
+      role: 'admin',
     });
 
     await adminUser.save();

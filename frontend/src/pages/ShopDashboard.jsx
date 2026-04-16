@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "../axiosConfig";
 import "./Shopkeeper.css";
+import FleetTrackerMap from "../components/FleetTrackerMap";
+import ShopLocationManager from "../components/shop/ShopLocationManager";
 
 const initialProducts = [
   { id: 1, name: "Basmati Rice", price: 85, stock: 50, category: "Grocery" },
@@ -119,7 +121,7 @@ export default function ShopDashboard() {
 
       {/* Tabs */}
       <div className="shop-dash-tabs">
-        {["overview", "products", "orders"].map(t => (
+        {["overview", "products", "orders", "location", "fleet"].map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -213,7 +215,7 @@ export default function ShopDashboard() {
           </div>
         )}
 
-        {/* ORDERS */}
+          {/* ORDERS */}
         {tab === "orders" && (
           <div>
             <h2 className="shop-dash-header">Orders</h2>
@@ -239,6 +241,20 @@ export default function ShopDashboard() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* LOCATION */}
+        {tab === "location" && (
+          <ShopLocationManager shopName={shop.shop} />
+        )}
+
+        {/* FLEET TRACKING */}
+        {tab === "fleet" && (
+          <div>
+            <h2 className="shop-dash-header">Fleet Tracking Map</h2>
+            <p style={{marginBottom: '1rem', color: 'var(--text-secondary)'}}>Live tracking of your assigned delivery agents.</p>
+            <FleetTrackerMap role="shopkeeper" />
           </div>
         )}
       </main>

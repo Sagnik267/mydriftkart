@@ -6,8 +6,24 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   phone: { type: String },
-  isAdmin: { type: Boolean, default: false },
-  isShopkeeper: { type: Boolean, default: false },
+  role: { 
+    type: String, 
+    enum: ['user', 'shopkeeper', 'admin', 'agent'], 
+    default: 'user' 
+  },
+  isSuspended: { type: Boolean, default: false },
+  agentStatus: { type: String, enum: ['online', 'offline'], default: 'offline' },
+  agentDetails: {
+    vehicleType: { type: String },
+    area: { type: String },
+    totalDeliveries: { type: Number, default: 0 },
+    rating: { type: Number, default: 0 }
+  },
+  currentLocation: {
+    lat: { type: Number },
+    lng: { type: Number },
+    timestamp: { type: Date }
+  },
   address: {
     street: { type: String },
     city: { type: String },

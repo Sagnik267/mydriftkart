@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Protect: must be logged in
+// Base protect: must be logged in (General)
 const protect = async (req, res, next) => {
   let token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'Not authorized, no token' });
@@ -25,4 +25,37 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+// Strict Role Protections
+const protectUser = (req, res, next) => {
+  if (req.user && req.user.role === 'user') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as a User.' });
+  }
+};
+
+const protectShopkeeper = (req, res, next) => {
+  if (req.user && req.user.role === 'shopkeeper') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as a Shopkeeper.' });
+  }
+};
+
+const protectAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as an Admin.' });
+  }
+};
+
+const protectAgent = (req, res, next) => {
+  if (req.user && req.user.role === 'agent') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as an Agent.' });
+  }
+};
+
+module.exports = { protect, protectUser, protectShopkeeper, protectAdmin, protectAgent };

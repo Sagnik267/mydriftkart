@@ -4,58 +4,42 @@ const User = require('../models/User');
 const Shop = require('../models/Shop');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const Notification = require('../models/Notification');
+const Settings = require('../models/Settings');
 
-// Get global administrative dashboard data
-// GET /api/admin/dashboard
+// ==========================================
+// 1. DASHBOARD & REVENUE AGGREGATION
+// ==========================================
 router.get('/dashboard', async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments({ isAdmin: false, isShopkeeper: false });
-    const totalShopkeepers = await User.countDocuments({ isShopkeeper: true });
+    const totalUsers = await User.countDocuments({ role: 'user' });
+    const totalShopkeepers = await User.countDocuments({ role: 'shopkeeper' });
     const totalProducts = await Product.countDocuments();
     const totalOrders = await Order.countDocuments();
     
-    // Revenue aggregator
+    // Revenue logic
     const deliveredOrders = await Order.find({ status: 'delivered', isPaid: true });
     const totalRevenue = deliveredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
-    const recentOrders = await Order.find().sort({ createdAt: -1 }).limit(5).populate('user', 'name');
-
-    // Aggregate monthly sales for the last 6 months
-    const today = new Date();
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(today.getMonth() - 5);
-    sixMonthsAgo.setDate(1);
-
-    const monthlySalesAggr = await Order.aggregate([
-      { 
-        $match: { 
-          createdAt: { $gte: sixMonthsAgo },
-          isPaid: true
-        } 
-      },
+    // Advanced 30-day daily charts
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const dailySalesAggr = await Order.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
       {
         $group: {
-          _id: { month: { $month: '$createdAt' }, year: { $year: '$createdAt' } },
-          revenue: { $sum: '$totalAmount' }
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          revenue: { $sum: '$totalAmount' },
+          orders: { $sum: 1 }
         }
       },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
+      { $sort: { '_id': 1 } }
     ]);
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthlySalesData = monthlySalesAggr.map(m => ({
-      name: months[m._id.month - 1],
-      revenue: m.revenue
-    }));
-
-    // Placeholder for categorywise and top selling logic (to be scaled)
-    const categoryWiseSales = [
-      { name: 'Helmets', value: 8000 },
-      { name: 'Tyres', value: 12000 },
-      { name: 'Accessories', value: 5000 }
-    ];
-    
-    const topSellingProducts = [];
+    // Orders By Status (Pie Chart)
+    const ordersByStatus = await Order.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
 
     res.json({
       totalUsers,
@@ -63,73 +47,164 @@ router.get('/dashboard', async (req, res) => {
       totalProducts,
       totalOrders,
       totalRevenue,
-      recentOrders,
-      monthlySalesData,
-      categoryWiseSales,
-      topSellingProducts
+      dailySalesAggr,
+      ordersByStatus
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Users
+// ==========================================
+// 2. ORDER MANAGEMENT
+// ==========================================
+router.get('/orders', async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate('user', 'name phone')
+      .populate('deliveryAgent', 'name phone')
+      .populate('items.product', 'name price')
+      .sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/orders/:id/status', async (req, res) => {
+  try {
+    const { status, note, cancelReason } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    
+    order.status = status;
+    if (cancelReason) order.cancelReason = cancelReason;
+    
+    order.timeline.push({ status, note: note || `Admin changed status to ${status}` });
+    await order.save();
+    
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/orders/:id/assign', async (req, res) => {
+  try {
+    const { agentId } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    
+    order.deliveryAgent = agentId;
+    order.status = 'confirmed';
+    order.timeline.push({ status: 'confirmed', note: `Admin assigned agent ${agentId}` });
+    await order.save();
+    
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ==========================================
+// 3. DELIVERY AGENT MANAGEMENT
+// ==========================================
+router.get('/agents', async (req, res) => {
+  try {
+    const agents = await User.find({ role: 'agent' }).select('-password');
+    res.json(agents);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/agents', async (req, res) => {
+  try {
+    const { name, email, phone, password, vehicleType, area } = req.body;
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ message: 'Email already in use' });
+    const agent = await User.create({
+      name, email, phone, password, role: 'agent',
+      agentDetails: { vehicleType, area, totalDeliveries: 0, rating: 5 }
+    });
+    res.json(agent);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/users/:id/suspend', async (req, res) => {
+  try {
+    const { isSuspended } = req.body;
+    const user = await User.findById(req.params.id);
+    user.isSuspended = isSuspended;
+    await user.save();
+    res.json({ message: `User suspension toggled` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ==========================================
+// 4. USER MANAGEMENT
+// ==========================================
 router.get('/users', async (req, res) => {
   try {
-    const users = await User.find({ isShopkeeper: false, isAdmin: false }).select('-password');
+    const users = await User.find({ role: 'user' }).select('-password');
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.put('/users/:id/make-admin', async (req, res) => {
+// ==========================================
+// 5. SHOP MANAGEMENT
+// ==========================================
+router.get('/shops', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    user.isAdmin = true;
-    await user.save();
-    res.json({ message: 'User is now an admin' });
+    const shops = await Shop.find().populate('user', 'name email');
+    res.json(shops);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.delete('/users/:id', async (req, res) => {
+router.put('/shops/:id/status', async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: 'User deleted' });
+    const shop = await Shop.findById(req.params.id);
+    shop.status = req.body.status;
+    await shop.save();
+    res.json(shop);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Shopkeepers
-router.get('/shopkeepers', async (req, res) => {
+router.put('/shops/:id/edit', async (req, res) => {
   try {
-    const shopkeepers = await User.find({ isShopkeeper: true }).select('-password');
-    res.json(shopkeepers);
+    const shop = await Shop.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(shop);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.delete('/shopkeepers/:id', async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.params.id);
-    // Find shop matching user
-    await Shop.findOneAndDelete({ user: req.params.id });
-    res.json({ message: 'Shopkeeper deleted' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// Products & Orders (Global ReadOnly / Delete)
+// ==========================================
+// 6. PRODUCT MANAGEMENT
+// ==========================================
 router.get('/products', async (req, res) => {
   try {
     const products = await Product.find().populate('shopkeeper', 'name');
     res.json(products);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/products/:id', async (req, res) => {
+  try {
+    const prod = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(prod);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -144,22 +219,47 @@ router.delete('/products/:id', async (req, res) => {
   }
 });
 
-router.get('/orders', async (req, res) => {
+// ==========================================
+// 7. NOTIFICATIONS
+// ==========================================
+router.post('/notifications', async (req, res) => {
   try {
-    const orders = await Order.find().populate('user', 'name').sort({ createdAt: -1 });
-    res.json(orders);
+    const notif = await Notification.create(req.body);
+    // In a real prod environment, you would push to APNs or FCM here
+    res.json(notif);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+router.get('/notifications', async (req, res) => {
+  try {
+    const notifs = await Notification.find().sort({ createdAt: -1 });
+    res.json(notifs);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.put('/orders/:id/status', async (req, res) => {
+// ==========================================
+// 8. SETTINGS
+// ==========================================
+router.get('/settings', async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    order.status = req.body.status;
-    await order.save();
-    res.json(order);
+    let settings = await Settings.findOne();
+    if (!settings) settings = await Settings.create({});
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/settings', async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+    if (!settings) settings = new Settings();
+    Object.assign(settings, req.body);
+    await settings.save();
+    res.json(settings);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

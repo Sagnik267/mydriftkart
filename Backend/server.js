@@ -15,11 +15,12 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const userRoutes = require("./routes/userRoutes");
 const shopRoutes = require("./routes/shopRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const agentRoutes = require("./routes/agentRoutes");
+const publicShopRoutes = require("./routes/publicShopRoutes");
+const storeRoutes = require("./routes/storeRoutes");
 
 // ✅ Auth Middleware
-const { protect } = require("./middleware/auth");
-const { admin } = require("./middleware/adminMiddleware");
-const { shopkeeper } = require("./middleware/shopkeeperMiddleware");
+const { protect, protectAdmin, protectShopkeeper, protectAgent } = require("./middleware/auth");
 
 const app = express();
 
@@ -38,8 +39,11 @@ connectDB();
 
 // ✅ Routes
 app.use("/api/auth", authRoutes);
-app.use("/api/admin", protect, admin, adminRoutes);
-app.use("/api/shop", protect, shopkeeper, shopRoutes);
+app.use("/api/admin", protect, protectAdmin, adminRoutes);
+app.use("/api/shop", protect, protectShopkeeper, shopRoutes);
+app.use("/api/shops", protect, publicShopRoutes);
+app.use("/api/stores", storeRoutes);
+app.use("/api/agent", protect, protectAgent, agentRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
@@ -57,7 +61,23 @@ app.use((err, req, res, next) => {
 
 
 
+const http = require("http");
+const { Server } = require("socket.io");
+const setupTrackerSocket = require("./sockets/trackerSocket");
+
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "*", // allow all origins for dev
+    methods: ["GET", "POST"]
+  }
+});
+
+setupTrackerSocket(io);
+
 // ✅ Start server
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+server.listen(5000, () => {
+  console.log("Server running on port 5000 with WebSockets");
 });

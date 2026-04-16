@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 // Load env
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/.env' });
 
 const User = require('./models/User');
 const Shop = require('./models/Shop');
@@ -56,7 +56,7 @@ const importData = async () => {
       name: 'DriftKart Admin',
       email: 'admin@driftkart.com',
       password: 'Admin@123',
-      isAdmin: true,
+      role: 'admin',
     });
 
     // 2. SHOPKEEPERS (5)
@@ -69,7 +69,7 @@ const importData = async () => {
         name: shopNames[i] + ' Owner',
         email: `shop${i + 1}@driftkart.com`,
         password: 'Shop@1234',
-        isShopkeeper: true,
+        role: 'shopkeeper',
         phone: `987654321${i}`
       });
       shopkeepers.push(sk);
@@ -93,6 +93,7 @@ const importData = async () => {
         name: userNames[i],
         email: `user${i + 1}@driftkart.com`,
         password: 'User@1234',
+        role: 'user',
         phone: `910000000${i}`,
         address: {
           street: `${randomInt(1, 99)}, Industrial Phase ${randomInt(1,5)}`,
@@ -104,7 +105,23 @@ const importData = async () => {
       users.push(usr);
     }
 
-    // 4. PRODUCTS (50) - Spread across 8 categories (at least 6 each)
+    // 4. DELIVERY AGENTS (2)
+    const agentNames = ["Raju Deliveries", "Vikram Logistics"];
+    let agents = [];
+    for (let i = 0; i < 2; i++) {
+      const ag = await User.create({
+        name: agentNames[i],
+        email: `agent${i + 1}@driftkart.com`,
+        password: 'Agent@123',
+        role: 'agent',
+        phone: `999888777${i}`,
+        agentStatus: 'offline'
+      });
+      agents.push(ag);
+    }
+    console.log('Created 2 Delivery Agents');
+
+    // 5. PRODUCTS (50) - Spread across 8 categories (at least 6 each)
     let products = [];
     let featuredCount = 0;
     let discountCount = 0;
@@ -146,7 +163,7 @@ const importData = async () => {
 
     // 5. ORDERS (30)
     let orders = [];
-    const statuses = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
+    const statuses = ["pending", "confirmed", "picked_up", "on_the_way", "delivered", "cancelled"];
     
     for (let i = 0; i < 30; i++) {
       const numItems = randomInt(1, 3);
